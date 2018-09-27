@@ -20,11 +20,19 @@
 ;;---------------
 
 (defrecord Position [x y])
-(defrecord Circle [x y r])
+(defrecord Circle [cx cy r th])
 
 ;;---------------
 
-(defn circle [system]
-  (let [ents (entities-with system Circle)]
-
-;;---------------
+(defn circle-tick [system tdelta]
+  (doseq [ent (entities-with system Circle)]
+    (let [c (get-in system [:entities ent Circle])
+          th (+ (:th c) tdelta)
+          p (get-in system [:entities ent Position])
+          x (+ (:cx c) (* (:r c) (Math/cos th)))
+          y (+ (:cy c) (* (:r c) (Math/sin th)))
+          ]
+    (-> system
+        (assoc-in [:entities ent Circle :th] th)
+        (assoc-in [:entities ent Position :x] x)
+        (assoc-in [:entities ent Position :y] y)))))
