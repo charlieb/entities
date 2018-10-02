@@ -2,7 +2,7 @@
 
 ;;---------------
 (defn make-entity [] (java.util.UUID/randomUUID))
-(defn make-system [] {:entities {}})
+(defn make-system [] {:entities {} :ticks 0})
 
 (defn add-component [system entity component]
   (let [ents (:entities system)
@@ -14,7 +14,17 @@
 (defn entities-with [system component-type]
   (keys (filter #(contains? (second %) component-type) (:entities system))))
 
-(defn add-system-function [system fn]
-  (assoc system :functions fn))
+(defn add-system-function [system fn tick-mod]
+  (assoc system :functions
+         (conj (:functions system) {:func fn :tick-mod tick-mod})))
+
+(defn tick [system]
+  (reduce (fn [sys func] (func sys))
+          system
+          (map :func (filter #(zero? (mod (:ticks system) (:tick-mod %)))
+                             (:functions system)))))
+
+(defn run []
+  )
 
 ;;---------------

@@ -8,28 +8,30 @@
 (defrecord Position [x y])
 (defrecord Velocity [vx vy])
 
-(defn velocity-tick [system tdelta]
+(defn velocity-tick [system]
   (reduce (fn [sys ent]
             (let [v (get-in sys [:entities ent Velocity])
                   p (get-in sys [:entities ent Position])]
               (-> sys
-                  (assoc-in [:entities ent Position :x] (+ (* (:vx v) tdelta) (:x p)))
-                  (assoc-in [:entities ent Position :y] (+ (* (:vy v) tdelta) (:y p)))))
-              )
-          system (keys (:entities system))))
+                  (assoc-in [:entities ent Position :x] (+ (:vx v) (:x p)))
+                  (assoc-in [:entities ent Position :y] (+ (:vy v) (:y p))))))
+          system (entities-with system Velocity)))
 
+(def velocity-test-ent make-entity)
+(def velocity-test-system
+  (-> (make-system)
+      (add-component velocity-test-ent (->Position 0 0))
+      (add-component velocity-test-ent (->Velocity 5 10))
+      (add-system-function velocity-tick 1)))
 
 (deftest apply-system-function
   "Velocity time tick"
-  (let [system (make-system)
-        ent (make-entity)]
-    (is (= (->Position 5 10)
-           (-> system
-               (add-component ent (->Position 0 0))
-               (add-component ent (->Velocity 5 10))
-               (velocity-tick 1)
-               (get-in [:entities ent Position])
-               )))))
+  (is (= (->Position 5 10)
+         (-> velocity-test-system
+             (tick)
+             (get-in [:entities velocity-test-ent Position])
+             ))))
+
 ;;---------------
 
 (deftest add-retrieve-component
