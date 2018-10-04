@@ -4,6 +4,25 @@
   )
 
 ;;---------------
+(def world-x 10)
+(def world-y 10)
+(def world-data
+  (letfn [(mk-row [] (vec (repeatedly world-y #(ref (->Tile)))))]
+    (vec (repeatedly world-x mk-row))))
+(defrecord World [data])
+(def world (->World world-data))
+
+(deftest shared-state-component
+  (let [ent1 (make-entity)
+        ent2 (make-entity)]
+    (-> (make-system)
+        (add-component ent1 world)
+        (add-component ent2 world)
+        (add-component ent1 (->Position 5 5))
+        (add-component ent2 (->Position 5 6))
+        )))
+
+;;---------------
 
 (defrecord Position [x y])
 (defrecord Velocity [vx vy])
@@ -17,7 +36,7 @@
                   (assoc-in [:entities ent Position :y] (+ (:vy v) (:y p))))))
           system (entities-with system Velocity)))
 
-(def velocity-test-ent make-entity)
+(def velocity-test-ent (make-entity))
 (def velocity-test-system
   (-> (make-system)
       (add-component velocity-test-ent (->Position 0 0))
