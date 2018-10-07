@@ -18,6 +18,18 @@
   (assoc system :functions
          (conj (:functions system) {:func fn :tick-mod tick-mod})))
 
+(defn get-entity-component [system ent comp]
+  (get-in system [:entities ent comp]))
+
+(defn get-in-entity-component [system ent comp path]
+  (get-in system (concat [:entities ent comp] path)))
+
+(defn assoc-entity-component [system ent comp val]
+  (assoc-in system [:entities ent comp] val))
+
+(defn assoc-in-entity-component [system ent comp path val]
+  (assoc-in system (concat [:entities ent comp] path) val))
+
 (defn tick [system]
   (reduce (fn [sys func] (func sys))
           system
