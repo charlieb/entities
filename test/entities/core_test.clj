@@ -1,5 +1,6 @@
 (ns entities.core-test
   (:require [clojure.test :refer :all]
+            [clojure.set :refer :all]
             [entities.core :refer :all])
   )
 
@@ -62,18 +63,18 @@
 (def world-x 1)
 (def world-y 4)
 (def world-data
-  (letfn [(mk-row [] (vec (repeatedly world-y #(ref nil))))]
+  (letfn [(mk-row [] (vec (repeatedly world-y #(ref #{}))))]
     (vec (repeatedly world-x mk-row))))
 (defrecord World [data])
 (def world (->World world-data))
 (defn reset-world []
   (dosync
-   (doseq [row (:data world)] (doseq [cell row] (ref-set cell nil)))))
+   (doseq [row (:data world)] (doseq [cell row] (ref-set cell #{})))))
 (defn init-world [system]
   (dosync 
    (doseq [ent (entities-with system Position)]
      (let [p (get-entity-component system ent Position)]
-       (ref-set (get-in-entity-component system ent World [:data (:x p) (:y p)]) true))))
+       (alter (get-in-entity-component system ent World [:data (:x p) (:y p)]) conj ent))))
   system)
 
 ;;---------------
@@ -85,11 +86,11 @@
                   w (get-entity-component sys ent World)
                   new-p (->Position (+ (:vx v) (:x p)) (+ (:vy v) (:y p)))]
               (dosync ;; dosync here in case the tx retries, we need to recheck the destination
-               (if @(get-in-entity-component sys ent World [:data  (:x new-p) (:y new-p)])
+               (if (not (empty? @(get-in-entity-component sys ent World [:data  (:x new-p) (:y new-p)])))
                  sys ;; move failed
                  (do ;; update the world in-place and return the new system
-                   (ref-set (get-in w [:data (:x p) (:y p)]) nil)
-                   (ref-set (get-in w [:data (:x new-p) (:y new-p)]) true)
+                   (alter (get-in w [:data (:x p) (:y p)]) difference #{ent})
+                   (alter (get-in w [:data (:x new-p) (:y new-p)]) conj ent)
                    (assoc-entity-component sys ent Position new-p))))))
           system
           (entities-with system Velocity)))
@@ -111,11 +112,12 @@
         sys (exclusive-velocity-system ent1 ent2)]
     (init-world sys) ;; Now the ents have position we set them in the world
     (is (= (get-entity-component sys ent1 World) (get-entity-component sys ent2 World)) "World consistent across ents before tick")
-    (is (and @(get-in-entity-component sys ent1 World [:data 0 0])
-             @(get-in-entity-component sys ent1 World [:data 0 1])
-             (nil? @(get-in-entity-component sys ent1 World [:data 0 2]))
-             (nil? @(get-in-entity-component sys ent1 World [:data 0 3])))
-        "Init world OK")))
+    (is (and (@(get-in-entity-component sys ent1 World [:data 0 0]) ent1)
+             (@(get-in-entity-component sys ent1 World [:data 0 1]) ent2)
+             (empty? @(get-in-entity-component sys ent1 World [:data 0 2]))
+             (empty? @(get-in-entity-component sys ent1 World [:data 0 3])))
+        "Init world OK")
+    ))
 
 (deftest shared-state-component-tick-no-change
   "Testing the world tick"
@@ -138,9 +140,8 @@
                 (tick))]
     (is (= (get-entity-component sys ent1 Position) (->Position 0 1)) "Move Entity OK")
     (is (= (get-entity-component sys ent1 World) (get-entity-component sys ent2 World)) "World consistent across ents after tick")
-    (is (and (nil? @(get-in-entity-component sys ent1 World [:data 0 0]))
-             @(get-in-entity-component sys ent1 World [:data 0 1])
-             @(get-in-entity-component sys ent2 World [:data 0 3])) "Move OK world")))
+    (is (and (empty? @(get-in-entity-component sys ent1 World [:data 0 0]))
+             (@(get-in-entity-component sys ent1 World [:data 0 1]) ent1)
+             (@(get-in-entity-component sys ent2 World [:data 0 3]) ent2)) "Move OK world")))
     
-
 ;;---------------
